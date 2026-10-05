@@ -1,0 +1,43 @@
+[package]
+name = "teknologi-io-t-a"
+version = "1.0.0"
+authors = ["shqat"]
+edition = "2021"
+resolver = "2"
+rust-version = "1.82"
+
+[[bin]]
+name = "teknologi-io-t-a"
+harness = false
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true
+opt-level = "z"
+
+[patch.crates-io]
+esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf.git" }
+esp-idf-hal = { git = "https://github.com/esp-rs/esp-idf.git" }
+esp-idf-svc = { git = "https://github.com/esp-rs/esp-idf.git" }
+
+[features]
+# Aktifkan setelah library Edge Impulse ditautkan: cargo build --release --features ei_integrated
+ei_integrated = []
+
+[dependencies]
+log        = "0.4"
+anyhow     = "1.0"
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2       = { version = "0.10", default-features = false }
+# esp-idf-hal ditarik otomatis oleh esp-idf-svc via git patch di atas
+esp-idf-hal = { version = "0.47", default-features = false }
+esp-idf-svc = { version = "0.53", features = ["critical-section", "alloc", "std"] }
+
+[build-dependencies]
+embuild = "0.33.5"
+# Aktifkan saat library Edge Impulse sudah di-export:
+# cc      = "1.0"
+# bindgen = "0.69"

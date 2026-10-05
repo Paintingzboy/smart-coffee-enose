@@ -1,0 +1,6 @@
+# Dibaca otomatis oleh `espflash flash` dan `espflash save-image`
+[idf_format_args]
+partition_table = "partitions.csv"
+
+[flash]
+size = "16MB"

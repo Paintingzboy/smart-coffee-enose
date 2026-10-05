@@ -1,0 +1,10 @@
+# JANGAN commit kredensial
+.env
+**/.env
+!**/.env.example
+node_modules/
+dist/
+target/
+firmware/.embuild/
+firmware/workspace/
+*.bin

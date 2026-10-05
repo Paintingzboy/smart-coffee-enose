@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-bench text-ink font-sans antialiased; font-feature-settings: "tnum" 1; }
+  :focus-visible { outline: 2px solid #2F6F8F; outline-offset: 2px; }
+  h1, h2, h3 { @apply font-display; letter-spacing: -0.01em; }
+}
+
+@layer components {
+  .panel { @apply bg-white border border-line rounded-panel; }
+  .panel-pad { @apply p-4 sm:p-5; }
+  .panel-title { @apply font-display text-lg font-semibold text-ink; }
+  .panel-sub { @apply text-sm text-ink-soft; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-roast text-white hover:bg-roast-dark; }
+  .btn-ghost { @apply btn border border-line bg-white text-ink hover:bg-bench; }
+  .btn-danger { @apply btn bg-danger text-white hover:brightness-95; }
+  .field { @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-signal focus:outline-none focus:ring-2 focus:ring-signal/20; }
+  .label { @apply mb-1 block text-xs font-medium text-ink-soft; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium; }
+  .num { font-variant-numeric: tabular-nums; }
+  .table-base { @apply w-full text-left text-sm; }
+  .table-base th { @apply whitespace-nowrap border-b border-line bg-bench/60 px-3 py-2 text-xs font-medium text-ink-soft; }
+  .table-base td { @apply whitespace-nowrap border-b border-line/70 px-3 py-2; }
+}
+
+.hero-bg {
+  /* Lapisan foto asli (public/assets/hero-coffee.jpg). Bila belum ada, browser
+     melewatinya dan pola biji kopi bawaan (hero-pattern.svg) yang tampil. */
+  background-color: #241A15;
+  background-image:
+    linear-gradient(100deg, rgba(36,26,21,.95) 0%, rgba(36,26,21,.82) 45%, rgba(36,26,21,.5) 100%),
+    url('/assets/hero-coffee.jpg'),
+    url('/assets/hero-pattern.svg');
+  background-size: cover, cover, 220px;
+  background-position: center, center, center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+.pulse-dot { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
