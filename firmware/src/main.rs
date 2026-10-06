@@ -100,7 +100,9 @@ fn run() -> Result<()> {
         warn!("NTP belum sinkron — timestamp absolut mungkin salah sampai sinkron");
     }
 
-    let (out_tx, out_rx) = mpsc::sync_channel::<Outgoing>(1200);
+    // sync_channel memesan memori untuk SEMUA slot sejak awal (±160 B/slot) — jangan besar-besar,
+    // RAM internal hanya ±280 KB dan MQTT+TLS butuh ±50 KB. 120 slot = 2 menit data @1 Hz.
+    let (out_tx, out_rx) = mpsc::sync_channel::<Outgoing>(120);
     let (cmd_tx, cmd_rx) = mpsc::channel::<AcqCommand>();
     let abort = Arc::new(AtomicBool::new(false));
 

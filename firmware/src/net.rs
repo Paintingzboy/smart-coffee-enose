@@ -149,6 +149,7 @@ pub fn run(mut ctx: NetCtx) {
                 continue;
             }
             last_mqtt_try = Instant::now();
+            info!("Membuat klien MQTT (heap bebas {} B)", unsafe { esp_idf_svc::sys::esp_get_free_heap_size() });
             match Mqtt::new() {
                 Ok(m) => mqtt = Some(m),
                 Err(e) => {
