@@ -1,8 +1,8 @@
 //! Konfigurasi firmware. Nilai rahasia TIDAK ditulis di kode — diisi saat build
 //! lewat environment variable, contoh (PowerShell):
 //!
-//!   $env:WIFI_SSID="Lab-IoT"; $env:WIFI_PASS="..."; $env:SERVER_URL="https://xxx.up.railway.app"
-//!   $env:DEVICE_KEY="..."; $env:DEVICE_ID="DAQ01"; $env:TB_TOKEN="..."; cargo build --release
+//!   $env:WIFI_SSID="Lab-IoT"; $env:WIFI_PASS="..."; $env:DEVICE_ID="DAQ01"
+//!   $env:TB_TOKEN="..."; cargo build --release
 //!
 //! Bila variabel tidak diset, nilai default di bawah yang dipakai.
 
@@ -17,18 +17,16 @@ macro_rules! env_or {
 
 /// WiFi lab (WPA2-Personal). Untuk WiFi tanpa password, kosongkan WIFI_PASS.
 pub const WIFI_SSID: &str = env_or!("WIFI_SSID", "TeknologiIoT");
-pub const WIFI_PASS: &str = env_or!("WIFI_PASS", "passwordwiFi");
+pub const WIFI_PASS: &str = env_or!("WIFI_PASS", "passwordwifi");
 
-/// URL publik backend (Railway). Untuk uji lokal: http://192.168.x.x:3000
-pub const SERVER_URL: &str = env_or!("SERVER_URL", "http://192.168.110.221:3000");
-/// Harus sama dengan DEVICE_API_KEY di backend.
-pub const DEVICE_KEY: &str = env_or!("DEVICE_KEY", "dev-device-key");
 /// ID perangkat — harus sama dengan nama device di ThingsBoard (DAQ01..DAQ05).
 pub const DEVICE_ID: &str = env_or!("DEVICE_ID", "DAQ01");
 
-/// ThingsBoard untuk OTA. TB_TOKEN = access token device (Devices → Copy access token).
-/// Bila kosong, fitur OTA nonaktif.
+/// ThingsBoard: semua komunikasi dengan server lewat MQTT (telemetry + RPC), OTA lewat HTTP.
+/// TB_TOKEN = access token device (Devices → Copy access token) — WAJIB diisi.
+/// Backend Railway membaca data perangkat dari ThingsBoard, bukan langsung dari ESP32.
 pub const TB_URL: &str = env_or!("TB_URL", "https://eu.thingsboard.cloud");
+pub const TB_MQTT_URL: &str = env_or!("TB_MQTT_URL", "mqtts://mqtt.eu.thingsboard.cloud:8883");
 pub const TB_TOKEN: &str = env_or!("TB_TOKEN", "");
 
 /// Judul firmware — harus sama dengan "fw_title" paket OTA di ThingsBoard.
@@ -45,7 +43,7 @@ pub const DEFAULT_DURATION_S: u32 = 500;
 pub const DEFAULT_PERIOD_MS: u32 = 1000;
 
 /// Interval komunikasi.
-pub const HEARTBEAT_MS: u64 = 3000;
+pub const HEARTBEAT_MS: u64 = 5000;
 pub const SAMPLE_FLUSH_MS: u64 = 5000;
 pub const OTA_POLL_S: u64 = 60;
 

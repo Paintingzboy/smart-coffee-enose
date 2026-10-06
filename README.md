@@ -4,13 +4,18 @@ Case-Based Project **Teknologi IoT 5A** — Departemen Teknik Instrumentasi, Fak
 Dosen pengampu: Ahmad Radhy.
 
 ```
-ESP32-S3 (Rust) ──HTTPS──► Backend Rust/Axum (Railway) ──► Azure SQL
-   ▲  heartbeat 3 s,          │  juga menyajikan dashboard React
-   │  data mentah, hasil      ▼
-   └──── OTA ◄── ThingsBoard Cloud EU ◄── dashboard (unggah .bin)
+ESP32-S3 (Rust) ══MQTT/TLS══► ThingsBoard Cloud EU ◄══WebSocket + REST══ Backend Rust/Axum (Railway) ──► Azure SQL
+   telemetry: heartbeat 5 s,       │  (broker MQTT)          RPC perintah      │  juga menyajikan dashboard React
+   data mentah, event, hasil   ◄───┘  RPC: start/stop/…                         │
+   OTA (HTTP Device API)       ◄────── paket .bin ◄──────── dashboard (unggah .bin)
 ```
 
-ESP32 hanya membuat koneksi **keluar** (HTTPS) ke server publik. Karena itu perangkat bisa
+Semua komunikasi ESP32 ↔ server lewat **MQTT** ThingsBoard (`mqtt.eu.thingsboard.cloud:8883`):
+ESP32 publish telemetry `enose_hb`, `enose_samples`, `enose_event`, `enose_reading` ke
+`v1/devices/me/telemetry` dan menerima perintah dashboard sebagai RPC `enose_cmd`. Backend
+(`backend/src/tb_bridge.rs`) membaca telemetry itu lewat WebSocket ThingsBoard dan mengirim RPC.
+
+ESP32 hanya membuat koneksi **keluar** (MQTT/TLS) ke server publik. Karena itu perangkat bisa
 dikendalikan dari mana saja (PC/HP) tanpa IP publik: cukup colokkan ESP32 ke daya → WiFi
 tersambung → muncul **online** di dashboard → operator menekan **Mulai rekam** →
 baca sensor 500 s → fitur + TinyML → simpan ke database.
@@ -74,5 +79,5 @@ Kunci operator default saat lokal: `dev-operator`. Untuk mode satu port (seperti
 ## Keamanan
 
 - `.env` **tidak boleh** di-commit (sudah di `.gitignore`). Ganti password Azure SQL lama yang sempat ada di ZIP.
-- Pengunjung umum hanya bisa **melihat**. Aksi kontrol butuh `OPERATOR_KEY`; ESP32 butuh `DEVICE_API_KEY`.
-- Firmware memverifikasi sertifikat HTTPS (opsi `ESP_TLS_INSECURE` dihapus).
+- Pengunjung umum hanya bisa **melihat**. Aksi kontrol butuh `OPERATOR_KEY`; ESP32 login MQTT dengan access token device ThingsBoard (`TB_TOKEN`). `DEVICE_API_KEY` hanya untuk endpoint HTTP lama (simulator).
+- Firmware memverifikasi sertifikat TLS (MQTT & HTTPS) dengan CA bundle ESP-IDF.

@@ -24,8 +24,9 @@ Railway dipilih karena paling sederhana: hubungkan repo GitHub → Railway memba
 ## 3. ThingsBoard Cloud (https://eu.thingsboard.cloud)
 1. **Entities → Devices → +**: buat device dengan nama **persis** `DAQ01` (dan `DAQ02`… bila ada).
 2. Buka device → **Copy access token** → ini `TB_TOKEN` untuk build firmware (per perangkat).
-3. Untuk backend: buat API key (menu *API keys* di profil, bila tersedia di akun Anda) → `TB_API_KEY`.
-   Bila menu itu tidak ada, pakai `TB_USERNAME` + `TB_PASSWORD` akun tenant.
+3. Untuk backend: isi `TB_USERNAME` + `TB_PASSWORD` akun tenant. **Wajib** — backend memakainya
+   untuk membaca telemetry MQTT dari ESP32 (WebSocket) dan mengirim perintah (RPC).
+   `TB_API_KEY` saja tidak cukup untuk WebSocket.
 4. Paket OTA dibuat otomatis oleh dashboard (halaman Perangkat & OTA) — tidak perlu manual.
 
 ## 4. Railway
@@ -39,7 +40,8 @@ Railway dipilih karena paling sederhana: hubungkan repo GitHub → Railway memba
    DEVICE_API_KEY=<acak panjang>
    OPERATOR_KEY=<acak panjang, dibagikan ke anggota tim>
    TB_URL=https://eu.thingsboard.cloud
-   TB_API_KEY=...               (atau TB_USERNAME + TB_PASSWORD)
+   TB_USERNAME=<email akun ThingsBoard>
+   TB_PASSWORD=<password akun ThingsBoard>
    ```
    Buat kunci acak: `openssl rand -hex 24` atau generator password.
 3. Tab **Settings → Networking → Generate Domain** → dapat URL seperti
@@ -54,5 +56,6 @@ Setiap `git push` ke branch utama otomatis redeploy. ESP32 yang sedang merekam s
 tetap aman: data ditahan di perangkat dan dikirim ulang setelah server kembali.
 
 ## 5. Firmware
-Lihat `docs/FIRMWARE.md`. Ringkasnya: build dengan `SERVER_URL=https://APP.up.railway.app`,
-`DEVICE_KEY=<DEVICE_API_KEY>`, `DEVICE_ID=DAQ01`, `TB_TOKEN=<token device>`, lalu flash.
+Lihat `docs/FIRMWARE.md`. Ringkasnya: build dengan `DEVICE_ID=DAQ01` dan
+`TB_TOKEN=<access token device DAQ01>`, lalu flash. ESP32 tidak perlu tahu URL Railway —
+ia hanya bicara MQTT dengan ThingsBoard; backend membaca datanya dari ThingsBoard.

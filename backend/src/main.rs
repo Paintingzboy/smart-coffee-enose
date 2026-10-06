@@ -1,7 +1,8 @@
 //! Smart Coffee E-Nose — Backend (Rust + Axum)
 //!
 //! Satu proses melayani:
-//!   • API perangkat  (/api/device/*, /api/readings)  ← ESP32-S3 via HTTPS
+//!   • Jembatan MQTT  (tb_bridge)                      ← ESP32-S3 via MQTT ThingsBoard
+//!   • API perangkat  (/api/device/*, /api/readings)  ← simulator / firmware lama via HTTPS
 //!   • API dashboard  (/api/*)                         ← browser
 //!   • File statis dashboard React (frontend/dist)     ← satu URL publik
 
@@ -11,6 +12,7 @@ mod models;
 mod routes;
 mod state;
 mod store;
+mod tb_bridge;
 mod thingsboard;
 
 use axum::{
@@ -37,6 +39,10 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    // reqwest & WebSocket ThingsBoard sama-sama memakai rustls; dengan dua penyedia kripto
+    // terpasang (ring + aws-lc-rs) rustls tidak bisa memilih sendiri → tetapkan ring.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let cfg = config::Config::from_env();
     let store = match &cfg.db {
         Some(db) => {
@@ -59,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
 
     dashboard::restore_active(&st).await;
     tokio::spawn(dashboard::sweeper(st.clone()));
+    tb_bridge::start(st.clone());
 
     let api = Router::new()
         // ── perangkat (X-Device-Key) ──

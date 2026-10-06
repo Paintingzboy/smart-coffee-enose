@@ -2,7 +2,7 @@
 //!
 //! Boot → WiFi → NTP → 2 thread:
 //!   • acquisition : warm-up, preview live, rekam 500 s, fitur, TinyML (tanpa jaringan)
-//!   • net         : heartbeat 3 s + ambil perintah dashboard, unggah data mentah & hasil, OTA ThingsBoard
+//!   • net         : MQTT ThingsBoard — heartbeat 5 s, perintah dashboard (RPC), data mentah & hasil; OTA
 //!
 //! ESP32 cukup dicolokkan ke daya: begitu WiFi tersambung, perangkat muncul "online"
 //! di dashboard dan menunggu tombol "Mulai rekam" — walau sensor belum terpasang.
@@ -14,6 +14,7 @@ mod config;
 mod dht22;
 mod ei_model;
 mod features;
+mod mqtt;
 mod net;
 mod ota;
 mod shared;
@@ -51,7 +52,7 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    info!("Smart Coffee E-Nose {FW_TITLE} v{FW_VERSION} — {DEVICE_ID} → {SERVER_URL}");
+    info!("Smart Coffee E-Nose {FW_TITLE} v{FW_VERSION} — {DEVICE_ID} → {TB_MQTT_URL}");
     let model = ei_model::EiModel::new();
     let shared = Shared::new(model.is_ready());
 

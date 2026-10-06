@@ -1,5 +1,5 @@
 //! State aplikasi bersama: konfigurasi, penyimpanan, ThingsBoard, dan registri
-//! perangkat yang sedang online (disimpan di memori — heartbeat 3 detik terlalu
+//! perangkat yang sedang online (disimpan di memori — heartbeat 5 detik terlalu
 //! sering untuk ditulis ke database).
 
 use crate::config::Config;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-pub const ONLINE_TIMEOUT: Duration = Duration::from_secs(12);
+pub const ONLINE_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_LIVE_HISTORY: usize = 300;
 const MAX_SAMPLES: usize = 4000;
 const MAX_EVENTS: usize = 40;

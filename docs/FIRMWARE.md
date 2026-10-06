@@ -9,8 +9,8 @@ I2C, DHT22, OTA nyata) — lakukan uji T-01…T-20 handbook setelah flash.
 
 | Sebelumnya | Sekarang |
 |---|---|
-| Menunggu `START|...` lewat kabel serial | Mengambil perintah dari dashboard lewat **heartbeat HTTPS 3 detik** (serial tetap ada sebagai cadangan offline) |
-| Kirim hasil ke IP LAN `192.168.x.x:3000` (HTTP mentah) | HTTPS ke URL publik Railway, sertifikat diverifikasi |
+| Menunggu `START|...` lewat kabel serial | Menerima perintah dashboard sebagai **RPC MQTT ThingsBoard** (serial tetap ada sebagai cadangan offline) |
+| Kirim hasil ke IP LAN `192.168.x.x:3000` (HTTP mentah) | **MQTT/TLS** ke ThingsBoard (`mqtt.eu.thingsboard.cloud:8883`), sertifikat diverifikasi; backend Railway membaca dari ThingsBoard |
 | ADS1115 tidak terpasang → `?` menghentikan firmware | Chip dibaca terpisah; perangkat tetap online dan melaporkan sensor mana yang hilang |
 | DHT22 gagal → menunggu selamanya | Non-blocking, nilai terakhir di-hold (zero-order hold), `dht_age_s` dicatat |
 | Data mentah hanya di log serial | Dikirim ke database tiap ±5 s (+ tetap dicetak `RAW_CSV` ke serial) |
@@ -33,10 +33,8 @@ Nilai rahasia diisi lewat environment variable saat build (tidak ditulis di kode
 PowerShell (Windows):
 ```powershell
 $env:WIFI_SSID="NamaWiFiLab"; $env:WIFI_PASS="passwordwifi"
-$env:SERVER_URL="https://APP.up.railway.app"
-$env:DEVICE_KEY="<sama dengan DEVICE_API_KEY di Railway>"
 $env:DEVICE_ID="DAQ01"                 # sama dengan nama device di ThingsBoard
-$env:TB_TOKEN="<access token device DAQ01 di ThingsBoard>"
+$env:TB_TOKEN="<access token device DAQ01 di ThingsBoard>"   # WAJIB: username MQTT
 $env:WARMUP_S="60"                     # minimal sebelum boleh rekam (SOP: tunggu ≥30 menit)
 cargo build --release
 ```
@@ -58,7 +56,7 @@ BL=$(find target/xtensa-esp32s3-espidf/release/build -name bootloader.bin | head
 espflash flash --bootloader "$BL" --monitor target/xtensa-esp32s3-espidf/release/teknologi-io-t-a
 ```
 
-Setelah menyala, log serial menampilkan `WiFi tersambung` lalu heartbeat. Di dashboard, perangkat
+Setelah menyala, log serial menampilkan `WiFi tersambung` lalu `MQTT tersambung`. Di dashboard, perangkat
 muncul **online** (status *Warm-up* dulu, lalu *Siap merekam*).
 
 ## Update firmware lewat OTA (tanpa kabel)

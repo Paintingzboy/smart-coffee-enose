@@ -1,12 +1,14 @@
-//! Thread jaringan: WiFi, heartbeat + perintah, unggah data mentah & hasil, OTA.
+//! Thread jaringan: WiFi, MQTT ThingsBoard (heartbeat, perintah RPC, data mentah
+//! & hasil), OTA.
 //!
-//! Semua koneksi KELUAR dari ESP32 (HTTPS), jadi perangkat bisa dikendalikan dari
-//! dashboard publik walau berada di balik NAT/WiFi kampus.
+//! Semua koneksi KELUAR dari ESP32 (MQTT/TLS ke ThingsBoard), jadi perangkat bisa
+//! dikendalikan dari dashboard publik walau berada di balik NAT/WiFi kampus.
 
 use crate::config::*;
+use crate::mqtt::{self, Mqtt};
 use crate::ota;
 use crate::shared::*;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use esp_idf_svc::{
     http::{
         client::{Configuration as HttpConfig, EspHttpConnection},
@@ -89,19 +91,6 @@ impl Http {
     }
 }
 
-fn api(path: &str) -> String {
-    format!("{}{}", SERVER_URL.trim_end_matches('/'), path)
-}
-
-/// POST ke backend dengan header X-Device-Key; error bila status bukan 2xx.
-fn post_backend(http: &mut Http, path: &str, body: &str) -> Result<Vec<u8>> {
-    let (status, resp) = http.post_json(&api(path), body, &[("X-Device-Key", DEVICE_KEY)])?;
-    if !(200..300).contains(&status) {
-        bail!("{path} → HTTP {status}: {}", String::from_utf8_lossy(&resp[..resp.len().min(200)]));
-    }
-    Ok(resp)
-}
-
 pub struct NetCtx {
     pub wifi: BlockingWifi<EspWifi<'static>>,
     pub nvs: EspDefaultNvsPartition,
@@ -112,7 +101,7 @@ pub struct NetCtx {
 }
 
 pub fn run(mut ctx: NetCtx) {
-    let mut http = Http::new();
+    let mut mqtt: Option<Mqtt> = None;
     let boot = Instant::now();
     let mut samples: Vec<(String, SampleRow)> = Vec::new();
     let mut posts: VecDeque<(&'static str, String)> = VecDeque::new();
@@ -120,6 +109,7 @@ pub fn run(mut ctx: NetCtx) {
     let mut last_flush = Instant::now();
     let mut last_ota = Instant::now();
     let mut last_wifi_try = Instant::now() - Duration::from_secs(60);
+    let mut last_mqtt_try = Instant::now() - Duration::from_secs(60);
     let mut last_ack: Option<u64> = None;
     let mut ota_requested = false;
     let mut reboot_pending = false;
@@ -136,7 +126,7 @@ pub fn run(mut ctx: NetCtx) {
                         samples.remove(0);
                     }
                 }
-                Outgoing::Post { path, body } => posts.push_back((path, body)),
+                Outgoing::Post { key, body } => posts.push_back((key, body)),
             }
         }
         ctx.shared.lock().unwrap().pending_uploads = (samples.len() + posts.len()) as u32;
@@ -152,14 +142,75 @@ pub fn run(mut ctx: NetCtx) {
             continue;
         }
 
-        // 3. Unggah data mentah (per ±5 detik), harus selesai sebelum hasil akhir dikirim
-        if !samples.is_empty() && (last_flush.elapsed() >= Duration::from_millis(SAMPLE_FLUSH_MS) || samples.len() >= 20 || !posts.is_empty()) {
+        // 3. MQTT — klien dibuat sekali, selanjutnya menyambung ulang sendiri
+        if mqtt.is_none() {
+            if last_mqtt_try.elapsed() < Duration::from_secs(10) {
+                std::thread::sleep(Duration::from_millis(300));
+                continue;
+            }
+            last_mqtt_try = Instant::now();
+            match Mqtt::new() {
+                Ok(m) => mqtt = Some(m),
+                Err(e) => {
+                    error!("MQTT tidak bisa dibuat: {e:#}");
+                    continue;
+                }
+            }
+        }
+        let m = mqtt.as_mut().unwrap();
+        m.poll();
+        if !m.is_connected() {
+            std::thread::sleep(Duration::from_millis(300));
+            continue;
+        }
+
+        // 4. Perintah dashboard (RPC ThingsBoard). Backend mengirim ulang perintah yang
+        //    sama sampai id-nya muncul sebagai last_ack di heartbeat → abaikan duplikat.
+        while let Some(cmd) = m.take_command() {
+            if Some(cmd.id) == last_ack {
+                continue;
+            }
+            info!("Perintah dari server: {} (id {})", cmd.kind, cmd.id);
+            last_ack = Some(cmd.id);
+            last_hb = Instant::now() - Duration::from_secs(60); // kirim ack secepatnya
+            match cmd.kind.as_str() {
+                "start" => match cmd.measurement {
+                    Some(meta) => {
+                        ctx.abort.store(false, Ordering::SeqCst);
+                        let _ = ctx.acq_tx.send(AcqCommand::Start {
+                            meta,
+                            duration_s: cmd.duration_s.unwrap_or(DEFAULT_DURATION_S),
+                            period_ms: cmd.sample_period_ms.unwrap_or(DEFAULT_PERIOD_MS),
+                            allow_missing: cmd.allow_missing_sensors.unwrap_or(false),
+                        });
+                    }
+                    None => warn!("Perintah start tanpa metadata"),
+                },
+                "stop" => ctx.abort.store(true, Ordering::SeqCst),
+                "zero_baseline" => {
+                    let _ = ctx.acq_tx.send(AcqCommand::ZeroBaseline);
+                }
+                "set_config" => {
+                    if let Some(p) = cmd.sample_period_ms {
+                        let _ = ctx.acq_tx.send(AcqCommand::SetPeriod(p));
+                    }
+                }
+                "check_ota" => ota_requested = true,
+                // Restart setelah ack terkirim lewat satu heartbeat lagi (hindari reboot berulang)
+                "reboot" => reboot_pending = true,
+                other => warn!("Perintah tidak dikenal: {other}"),
+            }
+        }
+
+        // 5. Unggah data mentah (per ±5 detik), harus selesai sebelum hasil akhir dikirim.
+        //    Maks. 10 baris per pesan agar nilai telemetry ThingsBoard tetap kecil.
+        if !samples.is_empty() && (last_flush.elapsed() >= Duration::from_millis(SAMPLE_FLUSH_MS) || samples.len() >= 10 || !posts.is_empty()) {
             last_flush = Instant::now();
             let mid = samples[0].0.clone();
-            let n = samples.iter().take(60).take_while(|(m, _)| *m == mid).count();
+            let n = samples.iter().take(10).take_while(|(m, _)| *m == mid).count();
             let rows: Vec<&SampleRow> = samples[..n].iter().map(|(_, r)| r).collect();
             let body = json!({ "device_id": DEVICE_ID, "measurement_id": mid, "rows": rows }).to_string();
-            match post_backend(&mut http, "/api/device/samples", &body) {
+            match m.send(mqtt::KEY_SAMPLES, &body, true) {
                 Ok(_) => {
                     samples.drain(..n);
                 }
@@ -167,64 +218,33 @@ pub fn run(mut ctx: NetCtx) {
             }
         }
 
-        // 4. Event & hasil akhir — berurutan, diulang sampai sukses
+        // 6. Event & hasil akhir — berurutan, diulang sampai PUBACK diterima
         if samples.is_empty() {
-            while let Some((path, body)) = posts.front() {
-                match post_backend(&mut http, path, body) {
+            while let Some((key, body)) = posts.front() {
+                match m.send(key, body, true) {
                     Ok(_) => {
-                        info!("Terkirim {path}");
+                        info!("Terkirim {key}");
                         posts.pop_front();
                     }
                     Err(e) => {
-                        warn!("Kirim {path} gagal (akan diulang): {e:#}");
+                        warn!("Kirim {key} gagal (akan diulang): {e:#}");
                         break;
                     }
                 }
             }
         }
 
-        // 5. Heartbeat + ambil perintah
+        // 7. Heartbeat (membawa last_ack sebagai tanda perintah sudah diterima)
         if last_hb.elapsed() >= Duration::from_millis(HEARTBEAT_MS) || reboot_pending {
             last_hb = Instant::now();
-            let hb = heartbeat(&mut http, &ctx, boot, last_ack);
-            if hb.is_ok() && !first_ok {
-                // Firmware baru berhasil bicara dengan server → tandai image OTA valid (cegah rollback)
-                first_ok = true;
-                ota::confirm_boot(&ctx.nvs);
-            }
-            match hb {
-                Ok(Some(cmd)) if Some(cmd.id) != last_ack => {
-                    info!("Perintah dari server: {} (id {})", cmd.kind, cmd.id);
-                    last_ack = Some(cmd.id);
-                    match cmd.kind.as_str() {
-                        "start" => match cmd.measurement {
-                            Some(meta) => {
-                                ctx.abort.store(false, Ordering::SeqCst);
-                                let _ = ctx.acq_tx.send(AcqCommand::Start {
-                                    meta,
-                                    duration_s: cmd.duration_s.unwrap_or(DEFAULT_DURATION_S),
-                                    period_ms: cmd.sample_period_ms.unwrap_or(DEFAULT_PERIOD_MS),
-                                    allow_missing: cmd.allow_missing_sensors.unwrap_or(false),
-                                });
-                            }
-                            None => warn!("Perintah start tanpa metadata"),
-                        },
-                        "stop" => ctx.abort.store(true, Ordering::SeqCst),
-                        "zero_baseline" => {
-                            let _ = ctx.acq_tx.send(AcqCommand::ZeroBaseline);
-                        }
-                        "set_config" => {
-                            if let Some(p) = cmd.sample_period_ms {
-                                let _ = ctx.acq_tx.send(AcqCommand::SetPeriod(p));
-                            }
-                        }
-                        "check_ota" => ota_requested = true,
-                        // Restart setelah ack terkirim lewat satu heartbeat lagi (hindari reboot berulang)
-                        "reboot" => reboot_pending = true,
-                        other => warn!("Perintah tidak dikenal: {other}"),
-                    }
-                }
+            let body = heartbeat_body(&ctx, boot, last_ack);
+            match m.send(mqtt::KEY_HEARTBEAT, &body, reboot_pending || !first_ok) {
                 Ok(_) => {
+                    if !first_ok {
+                        // Firmware baru berhasil bicara dengan server → tandai image OTA valid (cegah rollback)
+                        first_ok = true;
+                        ota::confirm_boot(&ctx.nvs);
+                    }
                     if reboot_pending {
                         warn!("Restart atas perintah dashboard");
                         std::thread::sleep(Duration::from_millis(300));
@@ -235,9 +255,9 @@ pub fn run(mut ctx: NetCtx) {
             }
         }
 
-        // 6. OTA (hanya saat idle — tidak pernah memotong perekaman)
+        // 8. OTA (hanya saat idle — tidak pernah memotong perekaman)
         let idle = ctx.shared.lock().unwrap().state == DevState::Idle;
-        if !TB_TOKEN.is_empty() && idle && samples.is_empty() && posts.is_empty()
+        if idle && samples.is_empty() && posts.is_empty()
             && (ota_requested || last_ota.elapsed() >= Duration::from_secs(OTA_POLL_S))
         {
             ota_requested = false;
@@ -251,7 +271,7 @@ pub fn run(mut ctx: NetCtx) {
     }
 }
 
-fn heartbeat(http: &mut Http, ctx: &NetCtx, boot: Instant, last_ack: Option<u64>) -> Result<Option<ServerCommand>> {
+fn heartbeat_body(ctx: &NetCtx, boot: Instant, last_ack: Option<u64>) -> String {
     let (ip, mac, rssi) = {
         let w = ctx.wifi.wifi();
         let ip = w.sta_netif().get_ip_info().map(|i| i.ip.to_string()).ok();
@@ -260,36 +280,28 @@ fn heartbeat(http: &mut Http, ctx: &NetCtx, boot: Instant, last_ack: Option<u64>
         });
         (ip, mac, w.get_rssi().ok())
     };
-    let body = {
-        let s = ctx.shared.lock().unwrap();
-        json!({
-            "device_id": DEVICE_ID,
-            "fw_title": FW_TITLE,
-            "fw_version": FW_VERSION,
-            "ip": ip, "mac": mac, "rssi": rssi,
-            "uptime_s": boot.elapsed().as_secs(),
-            "free_heap": unsafe { esp_idf_svc::sys::esp_get_free_heap_size() },
-            "min_free_heap": unsafe { esp_idf_svc::sys::esp_get_minimum_free_heap_size() },
-            "state": s.state.as_str(),
-            "warmup_remaining_s": s.warmup_remaining_s,
-            "measurement_id": s.measurement_id,
-            "samples_done": s.samples_done,
-            "samples_total": s.samples_total,
-            "sensors": s.sensors,
-            "live": s.live,
-            "last_ack": last_ack,
-            "last_error": s.last_error,
-            "ota": { "state": s.ota_state, "progress": s.ota_progress, "message": s.ota_message },
-            "sample_period_ms": s.sample_period_ms,
-            "model_ready": s.model_ready,
-            "pending_uploads": s.pending_uploads,
-        })
-        .to_string()
-    };
-    let resp = post_backend(http, "/api/device/heartbeat", &body)?;
-    let v: serde_json::Value = serde_json::from_slice(&resp)?;
-    Ok(match v.get("command") {
-        Some(c) if !c.is_null() => Some(serde_json::from_value(c.clone())?),
-        _ => None,
+    let s = ctx.shared.lock().unwrap();
+    json!({
+        "device_id": DEVICE_ID,
+        "fw_title": FW_TITLE,
+        "fw_version": FW_VERSION,
+        "ip": ip, "mac": mac, "rssi": rssi,
+        "uptime_s": boot.elapsed().as_secs(),
+        "free_heap": unsafe { esp_idf_svc::sys::esp_get_free_heap_size() },
+        "min_free_heap": unsafe { esp_idf_svc::sys::esp_get_minimum_free_heap_size() },
+        "state": s.state.as_str(),
+        "warmup_remaining_s": s.warmup_remaining_s,
+        "measurement_id": s.measurement_id,
+        "samples_done": s.samples_done,
+        "samples_total": s.samples_total,
+        "sensors": s.sensors,
+        "live": s.live,
+        "last_ack": last_ack,
+        "last_error": s.last_error,
+        "ota": { "state": s.ota_state, "progress": s.ota_progress, "message": s.ota_message },
+        "sample_period_ms": s.sample_period_ms,
+        "model_ready": s.model_ready,
+        "pending_uploads": s.pending_uploads,
     })
+    .to_string()
 }

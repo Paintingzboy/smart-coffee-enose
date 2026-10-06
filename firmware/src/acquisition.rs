@@ -66,7 +66,7 @@ impl AcqCtx {
     fn event(&self, measurement_id: Option<&str>, event: &str, message: Option<&str>, values: Option<Vec<f32>>) {
         let body = json!({ "device_id": DEVICE_ID, "measurement_id": measurement_id, "event": event,
                            "message": message, "values": values }).to_string();
-        let _ = self.tx.send(Outgoing::Post { path: "/api/device/event", body });
+        let _ = self.tx.send(Outgoing::Post { key: crate::mqtt::KEY_EVENT, body });
     }
 
     /// Baca DHT22 bila sudah ≥2 s sejak percobaan terakhir; nilai lama di-hold (zero-order hold).
@@ -289,7 +289,7 @@ fn record(ctx: &mut AcqCtx, env: &mut Env, meta: &MeasurementMeta, duration_s: u
     };
     let body = serde_json::to_string(&payload).unwrap_or_default();
     info!("PREDICTION_PAYLOAD,{body}");
-    let _ = ctx.tx.send(Outgoing::Post { path: "/api/readings", body });
+    let _ = ctx.tx.send(Outgoing::Post { key: crate::mqtt::KEY_READING, body });
     let note = if jitter_bad > 0 { Some(format!("{jitter_bad} sampel di luar toleransi jitter ±50 ms")) } else { None };
     ctx.event(Some(mid), "completed", note.as_deref(), None);
     info!("MEASUREMENT_COMPLETE,{mid},{done} rows");

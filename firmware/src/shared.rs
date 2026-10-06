@@ -93,7 +93,7 @@ pub struct MeasurementMeta {
     pub bean_state: String,
 }
 
-/// Perintah yang diterima dari server (lewat respons heartbeat).
+/// Perintah yang diterima dari server (lewat RPC ThingsBoard).
 #[derive(Clone, Debug, Deserialize)]
 pub struct ServerCommand {
     pub id: u64,
@@ -128,6 +128,6 @@ pub struct SampleRow {
 /// Pesan dari thread akuisisi → thread jaringan.
 pub enum Outgoing {
     Sample { measurement_id: String, row: SampleRow },
-    /// path API + body JSON (event / hasil akhir). Dikirim berurutan, diulang sampai berhasil.
-    Post { path: &'static str, body: String },
+    /// Kunci telemetry MQTT + body JSON (event / hasil akhir). Dikirim berurutan, diulang sampai berhasil.
+    Post { key: &'static str, body: String },
 }

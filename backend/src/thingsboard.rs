@@ -204,6 +204,77 @@ impl ThingsBoard {
         Ok(())
     }
 
+    /// JWT baru (login ulang) untuk WebSocket telemetry — hanya dengan TB_USERNAME/TB_PASSWORD.
+    pub async fn fresh_jwt(&self) -> Result<String> {
+        if self.cfg.username.is_none() || self.cfg.password.is_none() {
+            bail!("Jembatan MQTT butuh TB_USERNAME dan TB_PASSWORD (TB_API_KEY saja tidak cukup untuk WebSocket)");
+        }
+        let auth = self.auth_header(true).await?;
+        Ok(auth.trim_start_matches("Bearer ").to_string())
+    }
+
+    /// URL WebSocket telemetry (wss://host/api/ws).
+    pub fn ws_url(&self) -> String {
+        let base = self.cfg.url.replacen("https://", "wss://", 1).replacen("http://", "ws://", 1);
+        format!("{base}/api/ws")
+    }
+
+    /// Semua device milik tenant: (id ThingsBoard, nama).
+    pub async fn list_devices(&self) -> Result<Vec<(String, String)>> {
+        let base = self.cfg.url.clone();
+        let v = self
+            .send(|c| c.get(format!("{base}/api/tenant/devices")).query(&[("pageSize", "200"), ("page", "0")]))
+            .await?;
+        Ok(v["data"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|d| Some((id_of(d, "id")?, d["name"].as_str()?.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// RPC satu arah server → device (diterima ESP32 di v1/devices/me/rpc/request/+).
+    pub async fn send_rpc(&self, tb_device_id: &str, method: &str, params: Value) -> Result<()> {
+        let base = self.cfg.url.clone();
+        let id = tb_device_id.to_string();
+        let body = json!({ "method": method, "params": params, "timeout": 5000 });
+        self.send(|c| c.post(format!("{base}/api/rpc/oneway/{id}")).json(&body)).await?;
+        Ok(())
+    }
+
+    /// Riwayat telemetry (urut naik) — untuk mengejar pesan yang terlewat saat WebSocket putus.
+    pub async fn history(&self, tb_device_id: &str, keys: &str, start_ts: i64, end_ts: i64) -> Result<Vec<(String, i64, String)>> {
+        let base = self.cfg.url.clone();
+        let id = tb_device_id.to_string();
+        let (keys, start, end) = (keys.to_string(), start_ts.to_string(), end_ts.to_string());
+        let v = self
+            .send(|c| {
+                c.get(format!("{base}/api/plugins/telemetry/DEVICE/{id}/values/timeseries")).query(&[
+                    ("keys", keys.as_str()),
+                    ("startTs", start.as_str()),
+                    ("endTs", end.as_str()),
+                    ("limit", "1000"),
+                    ("orderBy", "ASC"),
+                    ("agg", "NONE"),
+                ])
+            })
+            .await?;
+        let mut out = Vec::new();
+        if let Some(obj) = v.as_object() {
+            for (k, arr) in obj {
+                for p in arr.as_array().into_iter().flatten() {
+                    if let (Some(ts), Some(val)) = (p["ts"].as_i64(), p["value"].as_str()) {
+                        out.push((k.clone(), ts, val.to_string()));
+                    }
+                }
+            }
+        }
+        out.sort_by_key(|x| x.1);
+        Ok(out)
+    }
+
     /// Telemetry status OTA terbaru yang dilaporkan ESP32 ke ThingsBoard.
     pub async fn fw_telemetry(&self, tb_device_id: &str) -> Result<Value> {
         let base = self.cfg.url.clone();

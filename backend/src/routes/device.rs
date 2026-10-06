@@ -1,4 +1,7 @@
-//! Endpoint yang dipanggil firmware ESP32-S3.
+//! Pemrosesan pesan dari ESP32-S3.
+//!
+//! Jalur utama: ESP32 → MQTT ThingsBoard → tb_bridge → fungsi `process_*` di bawah.
+//! Endpoint HTTP (X-Device-Key) tetap ada untuk simulator dan firmware lama.
 
 use super::require_device;
 use crate::error::{ApiError, ApiResult};
@@ -10,10 +13,14 @@ use chrono::Utc;
 use serde_json::{json, Value};
 use std::time::Instant;
 
-/// Heartbeat ±3 detik. Respons membawa perintah tertunda (bila ada) sehingga
+/// Heartbeat ±5 detik. Respons HTTP membawa perintah tertunda (bila ada) sehingga
 /// ESP32 di balik NAT/WiFi kampus tetap bisa dikendalikan tanpa IP publik.
 pub async fn heartbeat(State(st): State<Shared>, h: HeaderMap, Json(hb): Json<Heartbeat>) -> ApiResult<Json<Value>> {
     require_device(&h, &st)?;
+    process_heartbeat(&st, hb).await.map(Json)
+}
+
+pub async fn process_heartbeat(st: &Shared, hb: Heartbeat) -> ApiResult<Value> {
     if hb.device_id.is_empty() || hb.device_id.len() > 50 {
         return Err(ApiError::bad_request("device_id tidak valid"));
     }
@@ -82,12 +89,16 @@ pub async fn heartbeat(State(st): State<Shared>, h: HeaderMap, Json(hb): Json<He
         st.invalidate_list().await;
     }
 
-    Ok(Json(json!({ "server_time": Utc::now().to_rfc3339(), "command": command })))
+    Ok(json!({ "server_time": Utc::now().to_rfc3339(), "command": command }))
 }
 
 /// Potongan data mentah (dikirim tiap ±5 detik saat merekam).
 pub async fn samples(State(st): State<Shared>, h: HeaderMap, Json(batch): Json<SampleBatch>) -> ApiResult<Json<Value>> {
     require_device(&h, &st)?;
+    process_samples(&st, batch).await.map(Json)
+}
+
+pub async fn process_samples(st: &Shared, batch: SampleBatch) -> ApiResult<Value> {
     if batch.rows.len() > 600 {
         return Err(ApiError::bad_request("maksimal 600 baris per batch"));
     }
@@ -103,12 +114,16 @@ pub async fn samples(State(st): State<Shared>, h: HeaderMap, Json(batch): Json<S
         }
     }
     st.store.insert_samples(&batch.measurement_id, &batch.rows).await?;
-    Ok(Json(json!({ "ok": true, "stored": batch.rows.len() })))
+    Ok(json!({ "ok": true, "stored": batch.rows.len() }))
 }
 
 /// Event siklus hidup pengukuran (started/completed/failed/cancelled) dan event lain.
 pub async fn event(State(st): State<Shared>, h: HeaderMap, Json(ev): Json<DeviceEvent>) -> ApiResult<Json<Value>> {
     require_device(&h, &st)?;
+    process_event(&st, ev).await.map(Json)
+}
+
+pub async fn process_event(st: &Shared, ev: DeviceEvent) -> ApiResult<Value> {
     {
         let mut devices = st.devices.write().await;
         if let Some(dev) = devices.get_mut(&ev.device_id) {
@@ -138,12 +153,19 @@ pub async fn event(State(st): State<Shared>, h: HeaderMap, Json(ev): Json<Device
             st.invalidate_list().await;
         }
     }
-    Ok(Json(json!({ "ok": true })))
+    Ok(json!({ "ok": true }))
 }
 
 /// Hasil akhir (fitur ringkas + inferensi TinyML). Format kompatibel dengan firmware lama.
 pub async fn reading(State(st): State<Shared>, h: HeaderMap, Json(r): Json<Reading>) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
     require_device(&h, &st)?;
+    let inserted = process_reading(&st, r).await?;
+    let code = if inserted { axum::http::StatusCode::CREATED } else { axum::http::StatusCode::OK };
+    Ok((code, Json(json!({ "ok": true, "duplicate": !inserted }))))
+}
+
+/// Mengembalikan `true` bila hasil baru (bukan duplikat kiriman ulang).
+pub async fn process_reading(st: &Shared, r: Reading) -> ApiResult<bool> {
     if r.measurement_id.is_empty() {
         return Err(ApiError::bad_request("measurement_id kosong"));
     }
@@ -162,6 +184,5 @@ pub async fn reading(State(st): State<Shared>, h: HeaderMap, Json(r): Json<Readi
         }
     }
     st.invalidate_list().await;
-    let code = if inserted { axum::http::StatusCode::CREATED } else { axum::http::StatusCode::OK };
-    Ok((code, Json(json!({ "ok": true, "duplicate": !inserted }))))
+    Ok(inserted)
 }
