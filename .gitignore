@@ -8,3 +8,6 @@ target/
 firmware/.embuild/
 firmware/workspace/
 *.bin
+
+# Catatan pribadi (berisi token)
+CATATAN.md

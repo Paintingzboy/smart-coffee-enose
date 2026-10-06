@@ -10,7 +10,7 @@ export const SITE = {
   course: 'Teknologi Internet of Things (IoT)',
   classLabel: 'Kelas 5A — Semester Gasal 2026/2027',
   lecturer: 'Ahmad Radhy',
-  repoUrl: 'https://github.com/USERNAME/smart-coffee-enose', // ganti dengan repo kelompok
+  repoUrl: 'https://github.com/Paintingzboy/smart-coffee-enose',
   labContact: 'Laboratorium Departemen Teknik Instrumentasi ITS, Surabaya',
   thingsboardUrl: 'https://eu.thingsboard.cloud',
 }

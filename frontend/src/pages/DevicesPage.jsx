@@ -89,7 +89,7 @@ export default function DevicesPage() {
         )}
 
         {dev && (
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Panel title={`Detail ${dev.device_id}`} actions={<Badge tone={dev.online ? st.tone : 'danger'} dot>{dev.online ? st.label : 'Offline'}</Badge>}>
               <KV items={[
                 ['IP address', dev.ip], ['MAC address', dev.mac], ['Firmware', `${dev.fw_title || ''} v${dev.fw_version}`],
@@ -143,7 +143,7 @@ export default function DevicesPage() {
               {!tbCfg?.configured ? (
                 <Empty icon={CloudOff} title="ThingsBoard belum dikonfigurasi di server">Set variabel TB_URL dan TB_API_KEY (atau TB_USERNAME/TB_PASSWORD) di Railway, lalu redeploy.</Empty>
               ) : (
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <div>
                     <KV cols={1} items={[
                       ['Versi berjalan di perangkat', ota.data?.running_version],

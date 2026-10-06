@@ -66,7 +66,7 @@ export default function DashboardPage() {
           </a>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
           <Panel title="Live sensor monitoring" subtitle={dev ? `${dev.device_id} · diperbarui ${ago(dev.seconds_since_seen)}` : 'Belum ada perangkat'}
             actions={dev && !dev.online && <Badge tone="danger">Data basi — perangkat offline</Badge>}>
             {dev ? <SensorCards device={dev} history={live.history} samples={live.samples} /> : (
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           <ResponseCurve samples={live.samples} emptyText="Tekan “Mulai rekam” di halaman Klasifikasi Kopi untuk memulai pengukuran 500 detik." />
         </Panel>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Panel title="Hasil klasifikasi terakhir" subtitle={latest ? dateTime(latest.finished_at || latest.created_at) : 'Belum ada pengukuran selesai'}>
             {latest ? <PredictionCard row={latest} threshold={model?.confidence_threshold} /> : <Empty title="Belum ada hasil">Hasil pertama tampil setelah satu pengukuran selesai.</Empty>}
             <div className="mt-4"><ModelPanel model={model} /></div>

@@ -26,23 +26,24 @@ function Arrow({ d, label, lx, ly, dashed }) {
 function Architecture() {
   return (
     <div className="overflow-x-auto">
-      <svg viewBox="0 0 1000 420" className="min-w-[760px]" role="img" aria-label="Diagram arsitektur sistem">
+      <svg viewBox="0 0 1080 420" className="min-w-[760px]" role="img" aria-label="Diagram arsitektur sistem">
         <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A857F" /></marker></defs>
         <Box x={10} y={20} w={210} h={130} title="Chamber + sensor" lines={['8× MOS (MQ & TGS)', 'DHT22 (T, RH)', '2× ADS1115 16-bit (I²C)', 'Aliquot 10 g, pasif']} tone="#6E7F4E" />
-        <Box x={10} y={200} w={210} h={150} title="ESP32-S3 (Rust)" lines={['Task akuisisi 1 Hz', 'Fitur + TinyML (Edge Impulse)', 'Heartbeat & perintah (HTTPS)', 'OTA dengan rollback']} tone="#9A5B2E" fill="#F3E6DA" />
-        <Box x={360} y={150} w={250} h={150} title="Backend Rust (Axum)" lines={['Railway — 1 URL publik', 'API perangkat & dashboard', 'Antrian perintah, QC, ekspor', 'Menyajikan dashboard React']} tone="#2F6F8F" fill="#DEEAF0" />
-        <Box x={740} y={30} w={240} h={110} title="Azure SQL" lines={['measurement_sessions', 'measurement_samples (raw)', 'sensor_readings (hasil)']} />
-        <Box x={740} y={180} w={240} h={110} title="Dashboard React" lines={['PC & mobile', 'Live monitoring, riwayat', 'Klasifikasi, OTA']} />
-        <Box x={740} y={320} w={240} h={90} title="ThingsBoard Cloud (EU)" lines={['Paket OTA firmware', 'Atribut fw_* & fw_state']} tone="#7A4E8C" />
-        <Box x={360} y={340} w={250} h={70} title="Edge Impulse" lines={['Training → ekspor C++ library']} tone="#5B6472" />
+        <Box x={10} y={200} w={210} h={150} title="ESP32-S3 (Rust)" lines={['Task akuisisi 1 Hz', 'Fitur + TinyML (Edge Impulse)', 'MQTT/TLS ke ThingsBoard', 'OTA dengan rollback']} tone="#9A5B2E" fill="#F3E6DA" />
+        <Box x={310} y={170} w={220} h={140} title="ThingsBoard Cloud (EU)" lines={['Broker MQTT (port 8883)', 'Telemetry enose_* · RPC', 'Paket OTA firmware']} tone="#7A4E8C" fill="#EEE6F2" />
+        <Box x={610} y={150} w={215} h={150} title="Backend Rust (Axum)" lines={['Railway — 1 URL publik', 'Jembatan TB (WebSocket)', 'QC, ekspor, antrian perintah', 'Menyajikan dashboard React']} tone="#2F6F8F" fill="#DEEAF0" />
+        <Box x={880} y={30} w={190} h={110} title="Azure SQL" lines={['measurement_sessions', 'measurement_samples (raw)', 'sensor_readings (hasil)']} />
+        <Box x={880} y={180} w={190} h={110} title="Dashboard React" lines={['PC & mobile', 'Live monitoring, riwayat', 'Klasifikasi, OTA']} />
+        <Box x={610} y={335} w={215} h={70} title="Edge Impulse" lines={['Training → ekspor C++ library']} tone="#5B6472" />
         <Arrow d="M115 150 L115 196" label="analog → I²C" lx={170} ly={178} />
-        <Arrow d="M220 250 L356 220" label="HTTPS: heartbeat, data, hasil" lx={290} ly={220} />
-        <Arrow d="M356 250 L224 280" label="perintah (respons heartbeat)" lx={290} ly={290} />
-        <Arrow d="M610 190 L736 100" label="SQL (TLS)" lx={690} ly={135} />
-        <Arrow d="M610 230 L736 235" label="REST /api" lx={672} ly={225} />
-        <Arrow d="M610 270 L736 350" label="REST OTA" lx={690} ly={325} />
-        <Arrow d="M736 380 C 500 440, 260 420, 150 354" label="unduh firmware (HTTP device API)" lx={460} ly={330} dashed />
-        <Arrow d="M356 380 L224 330" dashed />
+        <Arrow d="M220 230 L306 230" label="MQTT/TLS" lx={263} ly={221} />
+        <Arrow d="M306 262 L224 262" label="RPC perintah" lx={263} ly={280} />
+        <Arrow d="M306 300 L224 322" label="OTA (HTTP)" lx={263} ly={330} dashed />
+        <Arrow d="M530 215 L606 215" label="WebSocket" lx={568} ly={206} />
+        <Arrow d="M606 255 L534 255" label="RPC (REST)" lx={570} ly={273} />
+        <Arrow d="M825 180 L876 100" label="SQL" lx={862} ly={150} />
+        <Arrow d="M825 235 L876 235" label="REST" lx={851} ly={226} />
+        <Arrow d="M606 385 C 430 425, 240 415, 140 354" label="model C++ (FFI)" lx={400} ly={402} dashed />
       </svg>
     </div>
   )
@@ -76,10 +77,10 @@ export default function AboutPage() {
     <>
       <PageHeader title="Tentang sistem & tim">Case-Based Project Smart Coffee Processing: IoT-Based Electronic Nose for Coffee Aroma Profiling and TinyML Classification.</PageHeader>
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        <Panel title="Arsitektur sistem" subtitle="ESP32 hanya membuat koneksi keluar (HTTPS), sehingga bekerja dari WiFi kampus mana pun tanpa IP publik">
+        <Panel title="Arsitektur sistem" subtitle="ESP32 hanya membuat koneksi keluar (MQTT/TLS ke ThingsBoard), sehingga bekerja dari WiFi mana pun tanpa IP publik">
           <Architecture />
         </Panel>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Panel title="Spesifikasi hardware">
             <ul className="space-y-2 text-sm">
               <li><b>Mikrokontroler:</b> ESP32-S3 (WiFi, dual-core), firmware Embedded Rust (esp-idf)</li>
@@ -101,7 +102,7 @@ export default function AboutPage() {
               <li><b>TinyML:</b> Edge Impulse (ekspor C++ library, dipanggil via FFI dari Rust)</li>
               <li><b>Backend:</b> Rust, Axum, Tokio, Tiberius (Azure SQL)</li>
               <li><b>Frontend:</b> React, Vite, Tailwind CSS, Recharts</li>
-              <li><b>Cloud:</b> Railway (hosting), Azure SQL Database, ThingsBoard Cloud EU (OTA)</li>
+              <li><b>Cloud:</b> Railway (hosting), Azure SQL Database, ThingsBoard Cloud EU (broker MQTT + OTA)</li>
             </ul>
           </Panel>
         </div>
@@ -114,7 +115,7 @@ export default function AboutPage() {
         </Panel>
         {TEAM.map((g) => (
           <Panel key={g.group} title={g.group}>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{g.members.map((m) => <Member key={m.nrp} m={m} />)}</div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{g.members.map((m) => <Member key={m.nrp} m={m} />)}</div>
           </Panel>
         ))}
       </div>

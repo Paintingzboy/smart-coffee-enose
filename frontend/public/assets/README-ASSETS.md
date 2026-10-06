@@ -3,7 +3,7 @@
 | File | Dipakai di | Rekomendasi |
 |---|---|---|
 | `hero-coffee.jpg` | Latar hero & header semua halaman | Foto biji kopi, landscape, ≥1920×1080, < 400 KB (kompres di squoosh.app). Bila tidak ada, pola `hero-pattern.svg` yang tampil. |
-| `logo-enose.svg` | Navbar, footer, favicon | Sudah ada logo bawaan — boleh diganti (SVG/PNG persegi). Jika PNG, ubah nama di `index.html` & `Navbar.jsx`. |
+| `logo-enose.png` | Navbar, footer, favicon | PNG persegi transparan. Bila diganti SVG, ubah nama di `index.html` & `Navbar.jsx`. |
 | `team/shauqi.jpg` | Kartu profil | Foto persegi ±400×400 |
 | `team/dio.jpg` | Kartu profil | |
 | `team/maulana.jpg` | Kartu profil | |

@@ -254,7 +254,7 @@ export default function ClassificationPage() {
               <Empty icon={FlaskConical} title="Siap untuk pengukuran">Timbang 10 g aliquot, panaskan 5 menit sesuai SOP, tutup chamber, lalu tekan Mulai rekam.</Empty>
             ) : (
               <>
-                <ol className="grid gap-3 sm:grid-cols-4">
+                <ol className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                   {STEPS.map((s, i) => {
                     const done = stepIndex > i || stepIndex === 4
                     const now = stepIndex === i && !failed
@@ -282,7 +282,7 @@ export default function ClassificationPage() {
             <ResponseCurve samples={curve} durationS={Number(row?.duration_s) || 500} />
           </Panel>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Panel title="Hasil klasifikasi">
               {row?.result ? (
                 <>

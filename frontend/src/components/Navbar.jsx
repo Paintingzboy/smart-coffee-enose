@@ -13,7 +13,7 @@ export const ROUTES = [
 ]
 
 export function Logo({ className = 'h-9 w-9' }) {
-  return <img src="/assets/logo-enose.svg" alt="" className={className} onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+  return <img src="/assets/logo-enose.png" alt="" className={className} onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
 }
 
 export default function Navbar({ route }) {

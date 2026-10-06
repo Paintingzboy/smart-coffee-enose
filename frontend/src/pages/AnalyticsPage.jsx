@@ -87,7 +87,7 @@ export default function AnalyticsPage() {
     <>
       <PageHeader title="Analisis & riwayat">Seluruh pengukuran tim. Data mentah tidak pernah dihapus — pengukuran bermasalah ditandai QC (handbook 17.5).</PageHeader>
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
           <Panel title="Filter & pencarian">
             <form onSubmit={apply} className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <label className="col-span-2"><span className="label">Cari Measurement_ID / Coffee_ID / catatan</span>
@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
           <p className="mt-2 text-xs text-ink-faint">Fitur: rerata late window + respons puncak 8 kanal (16 fitur, z-score). Hanya untuk eksplorasi; PCA dalam pipeline model wajib di-fit di dalam fold.</p>
         </Panel>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {[['contingency_batch_species', 'Batch_ID × Species'], ['contingency_daq_species', 'DAQ_ID × Species']].map(([key, title]) => {
             const obj = stats.data?.[key]
             const { rows, cols } = contingency(obj)
@@ -263,12 +263,12 @@ function DetailDrawer({ id, onClose, features, onChanged }) {
               ]} />
             </Panel>
             <Panel title="Kurva respons"><ResponseCurve samples={samples || []} height={260} durationS={row.duration_s} emptyText="Data mentah tidak tersedia untuk pengukuran ini." /></Panel>
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               <Panel title="Hasil">{row.result ? <PredictionCard row={row} threshold={model?.confidence_threshold} compact /> : <Empty title="Tanpa hasil inferensi" />}</Panel>
               <Panel title="Fingerprint"><FingerprintRadar a={fp} b={ref} aLabel="Pengukuran ini" bLabel={`Rerata ${row.coffee_id}`} height={240} /></Panel>
             </div>
             <Panel title="Kontrol kualitas" subtitle="Menandai, bukan menghapus. Alasan wajib dicatat.">
-              <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
                 <label><span className="label">QC_Flag</span><select className="field" value={qc} onChange={(e) => setQc(e.target.value)}><option>OK</option><option>SUSPECT</option><option>REJECT</option></select></label>
                 <label><span className="label">Catatan</span><input className="field" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="mis. chamber terbuka di detik 210" /></label>
               </div>
